@@ -253,7 +253,7 @@ int main() {
     ptrace_detach(pid);
  
     char command[128];
-    snprintf(command, sizeof(command), "pmap %d | grep rwx", pid);
+    snprintf(command, sizeof(command), "logcat --pid %d -v raw -v color", pid);
     INFO("%s", command);
     execlp("sh", "sh", "-c", command, nullptr);
     ERROR("pmap");

@@ -2,7 +2,7 @@
 .PHONY : run inject
 
 run: main injector hack.so
-	./main | ./injector
+	LD_DEBUG=1 ./main | ./injector
 
 inject: main hack.so
 	LD_PRELOAD=./hack.so ./main
