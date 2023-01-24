@@ -48,27 +48,27 @@ uintptr_t get_module_base(pid_t pid, std::string libpath) {
     }
 
     char maps_path[PATH_MAX];
-	sprintf(maps_path, "/proc/%d/maps", pid);
+    sprintf(maps_path, "/proc/%d/maps", pid);
 
-	FILE *maps = fopen(maps_path, "r");
-	if (maps == nullptr) {
-		ERROR("open maps");
-		return 0;
-	}
+    FILE *maps = fopen(maps_path, "r");
+    if (maps == nullptr) {
+        ERROR("open maps");
+        return 0;
+    }
 
-	void *addr = nullptr;
-	char path[PATH_MAX], perms[8], offset[16];
+    void *addr = nullptr;
+    char path[PATH_MAX], perms[8], offset[16];
 
-	while (fscanf(maps, "%p-%*p %s %s %*s %*s %[^\n]", &addr, perms, offset, path) != EOF) {
-		if (perms[2] != 'x') continue;
-		if (strcmp(path, libpath.c_str()) != 0) continue;
-		INFO("%s: %p, offset: %s", libpath.c_str(), addr, offset);
-		break;
-	}
+    while (fscanf(maps, "%p-%*p %s %s %*s %*s %[^\n]", &addr, perms, offset, path) != EOF) {
+        if (perms[2] != 'x') continue;
+        if (strcmp(path, libpath.c_str()) != 0) continue;
+        INFO("%s: %p, offset: %s", libpath.c_str(), addr, offset);
+        break;
+    }
 
-	fclose(maps);
+    fclose(maps);
 
-	return cache[key] = (uintptr_t) addr - strtoull(offset, nullptr, 16);
+    return cache[key] = (uintptr_t) addr - strtoull(offset, nullptr, 16);
 }
 
 uintptr_t get_func_addr(pid_t pid, std::string libpath, uintptr_t local_func) {
@@ -90,20 +90,20 @@ std::string get_library_path(std::string libname) {
     snprintf(tmpstr, sizeof(tmpstr), "/system/lib64/%s.so", libname.c_str());
 
     if (realpath(tmpstr, libpath) == nullptr) {
-		ERROR("resolve");
+        ERROR("resolve");
     }
 
-	return cache[libname] = libpath;
+    return cache[libname] = libpath;
 }
 
 void ptrace_attach(pid_t pid) {
-	if (ptrace(PTRACE_ATTACH, pid, nullptr, nullptr) == -1) {
-		ERROR("attach");
-	}
-	if (waitpid(pid, nullptr, WUNTRACED) != pid) {
-		ERROR("waitpid");
-	}
-	INFO("attached to pid: %d", pid);
+    if (ptrace(PTRACE_ATTACH, pid, nullptr, nullptr) == -1) {
+        ERROR("attach");
+    }
+    if (waitpid(pid, nullptr, WUNTRACED) != pid) {
+        ERROR("waitpid");
+    }
+    INFO("attached to pid: %d", pid);
 }
 
 void ptrace_detach(pid_t pid) {
@@ -113,29 +113,29 @@ void ptrace_detach(pid_t pid) {
 }
 
 void ptrace_get_regs(pid_t pid, pt_regs *regs) {
-	iovec iov {
-		.iov_base = regs,
-		.iov_len = sizeof(*regs)
-	};
-	if (ptrace(PTRACE_GETREGS, pid, NT_PRSTATUS, &iov) == -1) {
-		ERROR("backup regs");
-	}
+    iovec iov {
+        .iov_base = regs,
+        .iov_len = sizeof(*regs)
+    };
+    if (ptrace(PTRACE_GETREGS, pid, NT_PRSTATUS, &iov) == -1) {
+        ERROR("backup regs");
+    }
 }
 
 void ptrace_set_regs(pid_t pid, pt_regs *regs) {
-	iovec iov {
-		.iov_base = regs,
-		.iov_len = sizeof(*regs)
-	};
-	if (ptrace(PTRACE_SETREGS, pid, NT_PRSTATUS, &iov) == -1) {
-		ERROR("restore regs");
-	}
+    iovec iov {
+        .iov_base = regs,
+        .iov_len = sizeof(*regs)
+    };
+    if (ptrace(PTRACE_SETREGS, pid, NT_PRSTATUS, &iov) == -1) {
+        ERROR("restore regs");
+    }
 }
 
 void ptrace_continue(pid_t pid) {
-	if (ptrace(PTRACE_CONT, pid, nullptr, nullptr)) {
-		ERROR("continue");
-	}
+    if (ptrace(PTRACE_CONT, pid, nullptr, nullptr)) {
+        ERROR("continue");
+    }
 }
 
 void ptrace_write_data(pid_t pid, void *addr, void *buffer, size_t bufsize) {
@@ -159,40 +159,40 @@ void call_remote(pid_t pid, pt_regs *regs, uintptr_t addr, T... args) {
     size_t index = 0;
 
     INFO("calling function at %lx", addr);
-	for (int64_t it : { args... }) {
+    for (int64_t it : { args... }) {
         INFO("args[%zu] = %ld", index, it);
-		regs->regs[index++] = it;
-	}
+        regs->regs[index++] = it;
+    }
 
-	regs->ARM_pc = addr;
+    regs->ARM_pc = addr;
 
-	if (regs->ARM_pc & 1) {
-		regs->ARM_pc &= ~1;
-		regs->ARM_cpsr |= CPSR_T_MASK;
-	} else {
-		regs->ARM_cpsr &= ~CPSR_T_MASK;
-	}
+    if (regs->ARM_pc & 1) {
+        regs->ARM_pc &= ~1;
+        regs->ARM_cpsr |= CPSR_T_MASK;
+    } else {
+        regs->ARM_cpsr &= ~CPSR_T_MASK;
+    }
 
-	regs->ARM_lr = 0;
+    regs->ARM_lr = 0;
 
-	ptrace_set_regs(pid, regs);
+    ptrace_set_regs(pid, regs);
 
-	int status = 0;
-	while (status != ((SIGSEGV << 8) | 0x7f)) {
-		ptrace_continue(pid);
-		waitpid(pid, &status, WUNTRACED);
-		INFO("substatus: 0x%08x", status);
-	}
+    int status = 0;
+    while (status != ((SIGSEGV << 8) | 0x7f)) {
+        ptrace_continue(pid);
+        waitpid(pid, &status, WUNTRACED);
+        INFO("substatus: 0x%08x", status);
+    }
 
-	ptrace_get_regs(pid, regs);
+    ptrace_get_regs(pid, regs);
 }
 
 
 #define USE_REMOTE_FUNC(libname, func) template <class T, class... Args>  \
 T func##_remote (pid_t pid, pt_regs *regs, Args... args) {  \
-	auto path = get_library_path(#libname);  \
-	uintptr_t addr = get_func_addr(pid, path, (uintptr_t) func);  \
-	call_remote(pid, regs, addr, args...);  \
+    auto path = get_library_path(#libname);  \
+    uintptr_t addr = get_func_addr(pid, path, (uintptr_t) func);  \
+    call_remote(pid, regs, addr, args...);  \
     return (T) regs->ARM_r0;  \
 }
 
@@ -205,13 +205,13 @@ USE_REMOTE_FUNC(libdl, dlclose)
 int main() {
     pid_t pid; scanf("%d", &pid);
 
-	ptrace_attach(pid);
+   ptrace_attach(pid);
 
-	pt_regs regs, backup_regs;
-	ptrace_get_regs(pid, &regs);
-	memcpy(&backup_regs, &regs, sizeof(regs));
+    pt_regs regs, backup_regs;
+    ptrace_get_regs(pid, &regs);
+    memcpy(&backup_regs, &regs, sizeof(regs));
 
-	void *buffer = mmap_remote<void *>(
+    void *buffer = mmap_remote<void *>(
         pid, &regs, 
         (int64_t) nullptr, 
         (int64_t) getpagesize(), 
