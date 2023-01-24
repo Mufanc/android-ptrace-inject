@@ -198,6 +198,7 @@ T func##_remote (pid_t pid, pt_regs *regs, Args... args) {  \
 
 
 USE_REMOTE_FUNC(libc, mmap)
+USE_REMOTE_FUNC(libc, munmap)
 USE_REMOTE_FUNC(libdl, dlopen)
 USE_REMOTE_FUNC(libdl, dlclose)
 
@@ -231,6 +232,13 @@ int main() {
         1L /* RTLD_LAZY */
     );
     INFO("handle: %p", handle);
+
+    munmap_remote<int>(
+        pid, &regs, 
+        (int64_t) buffer,
+        (int64_t) getpagesize()
+    );
+    INFO("buffer unmapped!");
 
     // /*
     dlclose_remote<int>(
