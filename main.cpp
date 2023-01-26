@@ -16,9 +16,6 @@ int main(int argc, char *argv[]) {
     if (argc >= 2) {
         fprintf(stderr, "dlopen!\n");
         void *handle = dlopen(argv[1], 1 /* RTLD_LAZY */);
-        // if (dlclose(handle) == -1) {
-        //    perror("dlclose");
-        // }
     }
 
     for (int i = 0; i < 3; i++) {

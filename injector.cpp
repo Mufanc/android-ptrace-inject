@@ -173,8 +173,9 @@ void call_remote(pid_t pid, pt_regs *regs, uintptr_t addr, T... args) {
         regs->ARM_cpsr &= ~CPSR_T_MASK;
     }
 
-    regs->ARM_lr = 0;
-
+    // bypass android dlopen restriction
+    static uintptr_t LIBC = get_module_base(pid, get_library_path("libc"));
+    regs->ARM_lr = LIBC; 
     ptrace_set_regs(pid, regs);
 
     int status = 0;
@@ -203,8 +204,16 @@ USE_REMOTE_FUNC(libdl, dlopen)
 USE_REMOTE_FUNC(libdl, dlclose)
 
 
-int main() {
-    pid_t pid; scanf("%d", &pid);
+int main(int argc, char *argv[]) {
+    pid_t pid; 
+    if (argc == 3) {
+        pid = strtol(argv[1], nullptr, 10);
+    } else if (argc == 1) {
+        scanf("%d", &pid);
+    } else {
+        fprintf(stderr, "Usage: %s <pid> <so-file>\n", argv[0]);
+        exit(1);
+    }
 
    ptrace_attach(pid);
 
@@ -224,7 +233,12 @@ int main() {
     INFO("buffer: %p", buffer);
 
     const char *INJECT = "/proc/self/cwd/hack.so";
-    ptrace_write_data(pid, (void *) buffer, (void *) INJECT, strlen(INJECT));
+    if (argc == 3) {
+        INFO("loading: %s", argv[2]);
+        ptrace_write_data(pid, (void *) buffer, (void *) argv[2], strlen(argv[2]));
+    } else {
+        ptrace_write_data(pid, (void *) buffer, (void *) INJECT, strlen(INJECT));
+    }
 
     void *handle = dlopen_remote<void *>(
         pid, &regs,
@@ -233,14 +247,16 @@ int main() {
     );
     INFO("handle: %p", handle);
 
+    //*
     munmap_remote<int>(
         pid, &regs, 
         (int64_t) buffer,
         (int64_t) getpagesize()
     );
     INFO("buffer unmapped!");
+    // */
 
-    // /*
+    /* 
     dlclose_remote<int>(
         pid, &regs, 
         (int64_t) handle
@@ -251,12 +267,16 @@ int main() {
     INFO("registers restored");
 
     ptrace_detach(pid);
- 
-    char command[128];
-    snprintf(command, sizeof(command), "logcat --pid %d -v raw -v color", pid);
-    INFO("%s", command);
-    execlp("sh", "sh", "-c", command, nullptr);
-    ERROR("pmap");
+    
+    if (argc != 3) {
+        char command[128];
+        snprintf(command, sizeof(command), "logcat --pid %d -v raw -v color", pid);
+        INFO("%s", command);
+        execlp("sh", "sh", "-c", command, nullptr);
+        ERROR("pmap");
+    } else {
+        INFO("exiting...");
+    }
 
     return 0;
 } 
